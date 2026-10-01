@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Analytics — RTC</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="dash-body">
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="/app.html" class="brand"><span class="logo-dot">◉</span> RTC</a>
+      <span class="room-name">Meeting Analytics</span>
+    </div>
+    <div class="topbar-right">
+      <a href="/app.html" class="btn btn-ghost">Back</a>
+    </div>
+  </header>
+  <main class="dash-main" id="main">
+    <div class="panel">
+      <h2 id="roomTitle">Loading…</h2>
+      <p class="hint" id="roomSub"></p>
+      <div id="stats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-top: 20px;"></div>
+    </div>
+    <section class="panel">
+      <h2>🤖 AI Meeting Summary</h2>
+      <p class="hint">Extractive summary generated from the meeting transcript.</p>
+      <div id="summary" style="padding: 16px; background: var(--bg-3); border-radius: 12px; border: 1px solid var(--line); white-space: pre-wrap; line-height: 1.6; font-size: 14px; min-height: 80px;">
+        Loading…
+      </div>
+      <p style="font-size: 12px; color: var(--muted); margin-top: 10px;" id="summaryMeta"></p>
+    </section>
+
+    <div class="panel">
+      <h2>Participants</h2>
+      <div id="participants" class="room-list"></div>
+    </div>
+  </main>
+  <script type="module">
+    import { initTheme, apiJson, fmtDateTime } from '/js/ui.js';
+    initTheme();
+    const roomId = new URLSearchParams(location.search).get('id');
+    const $ = (s) => document.querySelector(s);
+    if (!roomId) location.href = '/app.html';
+
+    (async () => {
+      try {
+        const { analytics } = await apiJson(`/api/rooms/${encodeURIComponent(roomId)}/analytics`);
+        $('#roomTitle').textContent = analytics.name;
+        $('#roomSub').textContent = `Room ${analytics.roomId} · Created ${fmtDateTime(analytics.createdAt)}`;
+
+        const stats = [
+          { label: 'Participants', value: analytics.currentParticipants },
+          { label: 'Total joined', value: analytics.totalJoined },
+          { label: 'Messages', value: analytics.totalMessages },
+          { label: 'Files shared', value: analytics.totalFiles },
+          { label: 'Whiteboard strokes', value: analytics.totalStrokes },
+          { label: 'Polls', value: analytics.polls },
+        ];
+
+        $('#stats').innerHTML = '';
+        for (const s of stats) {
+          const card = document.createElement('div');
+          card.style.cssText = 'padding: 18px; background: var(--bg-3); border-radius: 12px; border: 1px solid var(--line);';
+          const v = document.createElement('div');
+          v.style.cssText = 'font-size: 32px; font-weight: 800; color: var(--accent);';
+          v.textContent = s.value;
+          const l = document.createElement('div');
+          l.style.cssText = 'font-size: 13px; color: var(--muted); margin-top: 4px;';
+          l.textContent = s.label;
+          card.appendChild(v);
+          card.appendChild(l);
+          $('#stats').appendChild(card);
+        }
+
+        $('#participants').innerHTML = '';
+        if (!analytics.participants.length) {
+          $('#participants').innerHTML = '<div class="empty">No session data yet</div>';
+        } else {
+          for (const p of analytics.participants) {
+            const row = document.createElement('div');
+            row.className = 'room-item';
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+            const t = document.createElement('div');
+            t.className = 'title';
+            t.textContent = p.name;
+            const s = document.createElement('div');
+            s.className = 'sub';
+            s.textContent = `${p.durationMin} minutes in meeting`;
+            meta.appendChild(t);
+            meta.appendChild(s);
+            row.appendChild(meta);
+            $('#participants').appendChild(row);
+          }
+        }
+      } catch (err) {
+        $('#roomTitle').textContent = 'Error: ' + err.message;
+      }
+    })();
+  </script>
+</body>
+</html>

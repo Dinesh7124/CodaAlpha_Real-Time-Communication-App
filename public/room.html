@@ -56,6 +56,9 @@
         <button class="tab" data-tab="people">People</button>
         <button class="tab" data-tab="notes">Notes</button>
         <button class="tab" data-tab="polls">Polls</button>
+        <button class="tab" data-tab="breakouts">Rooms</button>
+        <button class="tab" data-tab="agenda">Agenda</button>
+        <button class="tab" data-tab="transcript">Transcript</button>
       </div>
 
       <div id="tab-chat" class="tab-panel active">
@@ -82,12 +85,39 @@
           <div style="display: flex; gap: 8px;">
             <button id="muteAll" class="btn btn-ghost" style="flex: 1; font-size: 12px;">Mute all</button>
             <button id="lockRoom" class="btn btn-ghost" style="flex: 1; font-size: 12px;">Lock room</button>
+            <button id="waitingToggle" class="btn btn-ghost" style="flex: 1; font-size: 12px;">Waiting room</button>
+            <button id="startTimer" class="btn btn-ghost" style="flex: 1; font-size: 12px;">⏱ Timer</button>
           </div>
         </div>
       </div>
 
       <div id="tab-notes" class="tab-panel">
         <textarea id="notesEditor" class="notes-editor" placeholder="Shared notes… (everyone can edit)"></textarea>
+      </div>
+
+      <div id="tab-breakouts" class="tab-panel">
+        <div id="breakoutList" class="chat-log"></div>
+        <div id="hostBreakoutControls" class="hidden" style="padding: 12px; border-top: 1px solid var(--line);">
+          <input id="breakoutName" class="device-select" placeholder="Room name (e.g., Team A)" maxlength="60" />
+          <button id="createBreakout" class="btn" style="width: 100%;">+ Create breakout room</button>
+        </div>
+      </div>
+
+      <div id="tab-agenda" class="tab-panel">
+        <div id="agendaList" class="chat-log"></div>
+        <div style="padding: 12px; border-top: 1px solid var(--line);">
+          <input id="agendaItem" class="device-select" placeholder="Add agenda item" maxlength="200" />
+          <input id="agendaMinutes" class="device-select" type="number" min="1" max="120" placeholder="Minutes (optional)" />
+          <button id="addAgenda" class="btn" style="width: 100%;">+ Add item</button>
+        </div>
+      </div>
+
+      <div id="tab-transcript" class="tab-panel">
+        <div id="transcriptList" class="chat-log"></div>
+        <div style="padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px;">
+          <button id="downloadTranscript" class="btn btn-ghost" style="flex: 1;">📄 Download</button>
+          <button id="copyTranscript" class="btn btn-ghost" style="flex: 1;">📋 Copy</button>
+        </div>
       </div>
 
       <div id="tab-polls" class="tab-panel">
@@ -124,6 +154,7 @@
     <button id="btnBoard"    class="ctrl"        title="Whiteboard (W)">✏️</button>
     <button id="btnCaptions" class="ctrl"        title="Live captions (K)">💬</button>
     <button id="btnRecord"   class="ctrl"        title="Record">⏺️</button>
+    <button id="btnAnalytics" class="ctrl" title="Analytics">📊</button>
     <button id="btnLeave"    class="ctrl danger" title="Leave">📞</button>
   </footer>
 

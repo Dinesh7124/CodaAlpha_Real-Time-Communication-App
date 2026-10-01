@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { z } = require('zod');
 const db = require('./db');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 
 const router = express.Router();
 
@@ -228,6 +230,70 @@ router.post('/logout', (req, res) => {
   res.clearCookie(REFRESH_COOKIE, cookieOpts(0));
   res.json({ ok: true });
 });
+
+
+/* ---------------- 2FA ---------------- */
+
+router.post('/2fa/setup', requireAuth, async (req, res) => {
+  try {
+    const secret = speakeasy.generateSecret({
+      name: `RTC (${req.user.email})`,
+      issuer: 'RTC',
+    });
+
+    db.prepare('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?')
+      .run(secret.base32, req.user.id);
+
+    const qr = await QRCode.toDataURL(secret.otpauth_url);
+
+    res.json({ qr, secret: secret.base32 });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post('/2fa/enable', requireAuth, (req, res) => {
+  const { code } = req.body || {};
+  if (!code) return res.status(400).json({ error: 'Code required' });
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user || !user.totp_secret) return res.status(400).json({ error: 'Run setup first' });
+
+  const ok = speakeasy.totp.verify({
+    secret: user.totp_secret,
+    encoding: 'base32',
+    token: String(code),
+    window: 1,
+  });
+
+  if (!ok) return res.status(401).json({ error: 'Invalid code' });
+
+  db.prepare('UPDATE users SET totp_enabled = 1 WHERE id = ?').run(req.user.id);
+  audit(req.user.id, '2fa_enabled', null, req.ip);
+  res.json({ ok: true });
+});
+
+router.post('/2fa/disable', requireAuth, (req, res) => {
+  const { code } = req.body || {};
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  if (user.totp_enabled) {
+    const ok = speakeasy.totp.verify({
+      secret: user.totp_secret,
+      encoding: 'base32',
+      token: String(code || ''),
+      window: 1,
+    });
+    if (!ok) return res.status(401).json({ error: 'Invalid code' });
+  }
+
+  db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(req.user.id);
+  audit(req.user.id, '2fa_disabled', null, req.ip);
+  res.json({ ok: true });
+});
+
+
 
 router.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user });

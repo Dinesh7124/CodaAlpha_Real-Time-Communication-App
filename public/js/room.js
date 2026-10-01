@@ -20,7 +20,7 @@ let recordingChunks = [];
 const peerNames = new Map();
 const peerState = new Map();
 
-/* ---------- theme ---------- */
+/* ================= theme ================= */
 const themeToggleEl = $('#themeToggle');
 if (themeToggleEl) {
   themeToggleEl.textContent =
@@ -31,7 +31,7 @@ if (themeToggleEl) {
   });
 }
 
-/* ---------- helpers ---------- */
+/* ================= helpers ================= */
 function setConn(text, kind = '') {
   const el = $('#connState');
   if (!el) return;
@@ -39,7 +39,9 @@ function setConn(text, kind = '') {
   el.innerHTML = `<span class="dot"></span> ${text}`;
 }
 
-/* ---------- tiles ---------- */
+function fmtBytes(b) { return fmtSize(b); }
+
+/* ================= tiles ================= */
 function ensureTile(peerId, label, isLocal = false) {
   let tile = document.querySelector(`[data-peer="${CSS.escape(peerId)}"]`);
   if (!tile) {
@@ -142,7 +144,7 @@ function updateBadges(peerId) {
   tile.classList.toggle('screen', Boolean(state.screen));
 }
 
-/* ---------- people ---------- */
+/* ================= people ================= */
 function renderPeople() {
   const list = $('#peopleList');
   if (!list) return;
@@ -218,7 +220,164 @@ function renderPeople() {
   if (hc) hc.classList.toggle('hidden', !isHost);
 }
 
-/* ---------- chat ---------- */
+/* ================= waiting ================= */
+function renderWaitingList(waiting) {
+  let el = document.getElementById('waitingList');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'waitingList';
+    el.style.cssText = 'padding: 12px; border-bottom: 1px solid var(--line);';
+    const peopleTab = document.getElementById('tab-people');
+    if (peopleTab) peopleTab.insertBefore(el, peopleTab.firstChild);
+  }
+
+  el.innerHTML = '';
+  if (!waiting.length) return;
+
+  const header = document.createElement('div');
+  header.style.cssText = 'font-size: 12px; color: var(--muted); margin-bottom: 8px;';
+  header.textContent = `⏳ Waiting (${waiting.length})`;
+  el.appendChild(header);
+
+  waiting.forEach((w) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--bg-3); border-radius: 8px; margin-bottom: 6px; font-size: 13px;';
+
+    const n = document.createElement('span');
+    n.textContent = w.name;
+
+    const btns = document.createElement('div');
+    btns.style.display = 'flex';
+    btns.style.gap = '6px';
+
+    const admit = document.createElement('button');
+    admit.className = 'btn';
+    admit.textContent = '✓';
+    admit.style.padding = '4px 10px';
+    admit.addEventListener('click', () => socket.emit('waiting:admit', { targetId: w.socketId }));
+
+    const deny = document.createElement('button');
+    deny.className = 'btn btn-ghost';
+    deny.textContent = '✕';
+    deny.style.padding = '4px 10px';
+    deny.addEventListener('click', () => socket.emit('waiting:deny', { targetId: w.socketId }));
+
+    btns.appendChild(admit);
+    btns.appendChild(deny);
+    row.appendChild(n);
+    row.appendChild(btns);
+    el.appendChild(row);
+  });
+}
+
+/* ================= breakouts ================= */
+function renderBreakouts(list) {
+  const el = document.getElementById('breakoutList');
+  if (!el) return;
+  el.innerHTML = '';
+
+  if (!list || !list.length) {
+    el.innerHTML = '<div class="empty">No breakout rooms yet</div>';
+    return;
+  }
+
+  for (const b of list) {
+    const card = document.createElement('div');
+    card.className = 'poll-card';
+
+    const title = document.createElement('div');
+    title.className = 'q';
+    title.textContent = `${b.name} (${b.participants.length})`;
+    card.appendChild(title);
+
+    for (const sid of b.participants) {
+      const p = document.createElement('div');
+      p.style.cssText = 'font-size: 13px; color: var(--muted);';
+      p.textContent = `• ${peerNames.get(sid) || sid}`;
+      card.appendChild(p);
+    }
+
+    if (isHost) {
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'btn btn-ghost';
+      closeBtn.textContent = 'Close room';
+      closeBtn.style.marginTop = '8px';
+      closeBtn.addEventListener('click', () => socket.emit('breakout:close', { breakoutId: b.id }));
+      card.appendChild(closeBtn);
+    }
+
+    el.appendChild(card);
+  }
+}
+
+/* ================= agenda ================= */
+function renderAgenda(list) {
+  const el = document.getElementById('agendaList');
+  if (!el) return;
+  el.innerHTML = '';
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">No agenda items yet</div>';
+    return;
+  }
+
+  list.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'poll-card';
+    card.style.cssText = 'padding: 10px; margin-bottom: 6px;';
+
+    const row = document.createElement('div');
+    row.style.cssText = 'display: flex; gap: 8px; align-items: center;';
+
+    const num = document.createElement('span');
+    num.style.cssText = 'font-weight: 700; color: var(--accent); min-width: 24px;';
+    num.textContent = `${i + 1}.`;
+
+    const text = document.createElement('span');
+    text.style.flex = '1';
+    text.textContent = item.text;
+
+    const min = document.createElement('span');
+    min.style.cssText = 'font-size: 12px; color: var(--muted);';
+    if (item.minutes) min.textContent = `${item.minutes}m`;
+
+    row.appendChild(num);
+    row.appendChild(text);
+    row.appendChild(min);
+
+    if (item.done) {
+      text.style.textDecoration = 'line-through';
+      text.style.opacity = '0.5';
+    }
+
+    card.appendChild(row);
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display: flex; gap: 6px; margin-top: 6px;';
+
+    const done = document.createElement('button');
+    done.className = 'btn btn-ghost';
+    done.style.cssText = 'font-size: 11px; padding: 3px 8px;';
+    done.textContent = item.done ? '↺' : '✓';
+    done.addEventListener('click', () => socket.emit('agenda:toggle', { index: i }));
+
+    actions.appendChild(done);
+
+    if (isHost) {
+      const del = document.createElement('button');
+      del.className = 'btn btn-ghost';
+      del.style.cssText = 'font-size: 11px; padding: 3px 8px;';
+      del.textContent = '✕';
+      del.addEventListener('click', () => socket.emit('agenda:remove', { index: i }));
+      actions.appendChild(del);
+    }
+
+    card.appendChild(actions);
+    el.appendChild(card);
+  });
+}
+
+/* ================= chat ================= */
 function addChatMessage({ from, text, at, system }) {
   const log = $('#chatLog');
   if (!log) return;
@@ -237,7 +396,7 @@ function addChatMessage({ from, text, at, system }) {
   log.scrollTop = log.scrollHeight;
 }
 
-/* ---------- files ---------- */
+/* ================= files ================= */
 function addFileEntry(file) {
   const list = $('#fileList');
   if (!list) return;
@@ -258,7 +417,7 @@ function addFileEntry(file) {
   list.prepend(item);
 }
 
-/* ---------- polls ---------- */
+/* ================= polls ================= */
 function renderPoll(poll) {
   const list = $('#pollList');
   if (!list) return;
@@ -314,7 +473,7 @@ function renderPoll(poll) {
   card.appendChild(meta);
 }
 
-/* ---------- reactions ---------- */
+/* ================= reactions ================= */
 function showReaction(peerId, emoji) {
   const tile = document.querySelector(`[data-peer="${CSS.escape(peerId)}"]`);
   if (!tile) return;
@@ -328,7 +487,7 @@ function showReaction(peerId, emoji) {
   setTimeout(() => el.remove(), 2600);
 }
 
-/* ---------- tabs ---------- */
+/* ================= tabs ================= */
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
@@ -339,7 +498,7 @@ document.querySelectorAll('.tab').forEach((tab) => {
   });
 });
 
-/* ---------- whiteboard ---------- */
+/* ================= whiteboard ================= */
 function openBoard() {
   const va = $('#videoArea');
   const ba = $('#boardArea');
@@ -347,10 +506,7 @@ function openBoard() {
   if (va) va.classList.add('hidden');
   if (ba) ba.classList.remove('hidden');
   if (bb) bb.classList.add('active');
-  if (board) {
-    board.setEnabled(true);
-    board.resize();
-  }
+  if (board) { board.setEnabled(true); board.resize(); }
 }
 function closeBoard() {
   const va = $('#videoArea');
@@ -366,10 +522,7 @@ document.querySelectorAll('.swatch').forEach((sw) => {
   sw.addEventListener('click', () => {
     document.querySelectorAll('.swatch').forEach((s) => s.classList.remove('active'));
     sw.classList.add('active');
-    if (board) {
-      board.setColor(sw.dataset.color);
-      board.setEraser(false);
-    }
+    if (board) { board.setColor(sw.dataset.color); board.setEraser(false); }
     const eb = $('#eraserBtn');
     if (eb) eb.textContent = 'Eraser: off';
   });
@@ -397,7 +550,7 @@ if (btnBoardEl) {
   });
 }
 
-/* ---------- QR ---------- */
+/* ================= QR ================= */
 const qrBtnEl = $('#qrBtn');
 if (qrBtnEl) {
   qrBtnEl.addEventListener('click', () => {
@@ -414,7 +567,7 @@ if (qrBtnEl) {
   });
 }
 
-/* ---------- captions (SAFE) ---------- */
+/* ================= captions ================= */
 let captions = null;
 let captionTimer = null;
 
@@ -428,7 +581,6 @@ function renderCaption(text, interim) {
   span.textContent = text;
   if (interim) span.className = 'interim';
   el.appendChild(span);
-
   clearTimeout(captionTimer);
   captionTimer = setTimeout(() => overlay.classList.add('hidden'), 4000);
 }
@@ -438,8 +590,11 @@ if (btnCaptionsEl) {
   btnCaptionsEl.addEventListener('click', () => {
     if (!captions) {
       captions = new Captions({
-        onTranscript: (text) => {
-          if (socket) socket.emit('caption', text);
+                onTranscript: (text) => {
+          if (socket) {
+            socket.emit('caption', text);
+            socket.emit('transcript:append', text);
+          }
           renderCaption(text, false);
         },
         onInterim: (text) => renderCaption(text, true),
@@ -462,7 +617,7 @@ if (btnCaptionsEl) {
   });
 }
 
-/* ---------- boot ---------- */
+/* ================= boot ================= */
 async function boot() {
   try {
     const { user } = await apiJson('/api/auth/me');
@@ -483,10 +638,8 @@ async function boot() {
   }
 
   document.title = `${room.name} — RTC`;
-  const rn = $('#roomName');
-  if (rn) rn.textContent = room.name;
-  const rl = $('#roomLink');
-  if (rl) rl.value = location.href;
+  const rn = $('#roomName'); if (rn) rn.textContent = room.name;
+  const rl = $('#roomLink'); if (rl) rl.value = location.href;
 
   await loadIceServers();
 
@@ -533,14 +686,9 @@ async function boot() {
     const stream = await mesh.startLocal({ startMuted, startCamOff });
     const tile = ensureTile('local', me.name, true);
     const video = tile.querySelector('video');
-    if (video) {
-      video.srcObject = stream;
-      video.play().catch(() => {});
-    }
-    const bm = $('#btnMic');
-    if (bm) bm.className = 'ctrl ' + (mesh.audioEnabled ? 'on' : 'off');
-    const bc = $('#btnCam');
-    if (bc) bc.className = 'ctrl ' + (mesh.videoEnabled ? 'on' : 'off');
+    if (video) { video.srcObject = stream; video.play().catch(() => {}); }
+    const bm = $('#btnMic'); if (bm) bm.className = 'ctrl ' + (mesh.audioEnabled ? 'on' : 'off');
+    const bc = $('#btnCam'); if (bc) bc.className = 'ctrl ' + (mesh.videoEnabled ? 'on' : 'off');
   } catch (err) {
     toast('Camera/mic error: ' + err.message, 'error', 6000);
     setTimeout(() => (location.href = '/app.html'), 1500);
@@ -551,16 +699,25 @@ async function boot() {
   mesh.socket = socket;
   board = new Whiteboard({ canvas: $('#board'), socket });
 
+  /* ---------- SOCKET LISTENERS (all at top level of boot) ---------- */
   socket.on('connect_error', () => setConn('auth failed', 'bad'));
+
   socket.on('connect', () => {
     setConn('connected', 'ok');
     const lobbyPassword = sessionStorage.getItem('rtc_lobby_password') || '';
     socket.emit('room:join', { roomId, password: lobbyPassword }, (res) => {
-      if (!res || res.error) {
-        toast(res && res.error ? res.error : 'Could not join', 'error');
+      if (!res) return;
+      if (res.waiting) {
+        setConn('waiting for host', '');
+        toast('Waiting for host approval…', 'info', 10000);
+        return;
+      }
+      if (res.error) {
+        toast(res.error, 'error');
         setTimeout(() => (location.href = '/app.html'), 1200);
         return;
       }
+
       isHost = res.isOwner;
       sessionStorage.removeItem('rtc_lobby_password');
 
@@ -576,15 +733,23 @@ async function boot() {
       (res.files || []).forEach(addFileEntry);
       (res.messages || []).forEach((m) => addChatMessage({ from: m.from, text: m.text, at: m.at }));
       (res.polls || []).forEach(renderPoll);
-      const ne = $('#notesEditor');
-      if (ne) ne.value = res.notes || '';
-      const lb = $('#lockBadge');
-      if (lb) lb.classList.toggle('hidden', !res.locked);
-      const lr = $('#lockRoom');
-      if (lr) lr.textContent = res.locked ? 'Unlock room' : 'Lock room';
+      if (res.agenda) renderAgenda(res.agenda);
+      (res.transcript || []).forEach(appendTranscriptLine);
+      if (res.breakouts) renderBreakouts(res.breakouts);
+
+      const ne = $('#notesEditor'); if (ne) ne.value = res.notes || '';
+      const lb = $('#lockBadge'); if (lb) lb.classList.toggle('hidden', !res.locked);
+      const lr = $('#lockRoom'); if (lr) lr.textContent = res.locked ? 'Unlock room' : 'Lock room';
+      const wt = $('#waitingToggle'); if (wt && res.waitingRoom !== undefined) wt.classList.toggle('active', res.waitingRoom);
+      const hbc = $('#hostBreakoutControls'); if (hbc) hbc.classList.toggle('hidden', !isHost);
+
+      // Request timer
+      socket.emit('timer:ping');
+
       renderPeople();
     });
   });
+
   socket.on('disconnect', () => setConn('disconnected', 'bad'));
 
   socket.on('signal', ({ from, data }) => mesh.handleSignal(from, data));
@@ -624,19 +789,123 @@ async function boot() {
 
   socket.on('chat:message', (msg) => addChatMessage(msg));
   socket.on('file:shared', (f) => addFileEntry(f));
-  socket.on('notes:update', (text) => {
-    const ne = $('#notesEditor');
-    if (ne) ne.value = text;
-  });
-
+  socket.on('notes:update', (text) => { const ne = $('#notesEditor'); if (ne) ne.value = text; });
   socket.on('poll:created', (poll) => renderPoll(poll));
   socket.on('poll:updated', (poll) => renderPoll(poll));
   socket.on('reaction', ({ peerId, emoji }) => showReaction(peerId, emoji));
 
+  /* -------- Waiting room events -------- */
+  socket.on('waiting:list', ({ waiting }) => renderWaitingList(waiting || []));
+  socket.on('waiting:admitted', () => {
+    toast('You have been admitted', 'ok');
+    setConn('connected', 'ok');
+    socket.emit('room:join', {
+      roomId,
+      password: sessionStorage.getItem('rtc_lobby_password') || '',
+    }, () => {});
+  });
+  socket.on('waiting:denied', () => {
+    toast('Host denied your request', 'error');
+    setTimeout(() => (location.href = '/app.html'), 1500);
+  });
+  socket.on('host:waiting-toggled', ({ enabled }) => {
+    toast(enabled ? 'Waiting room ON' : 'Waiting room OFF', 'info');
+    const wt = $('#waitingToggle');
+    if (wt) wt.classList.toggle('active', enabled);
+  });
+
+  /* -------- Breakout events -------- */
+  socket.on('breakout:list', (list) => renderBreakouts(list));
+  socket.on('breakout:assigned', ({ name }) => {
+    toast(`Assigned to breakout: ${name}`, 'info', 5000);
+  });
+  socket.on('breakout:closed', () => toast('Breakout room closed', 'info'));
+
+  /* -------- Timer -------- */
+  let timerRaf = 0;
+  socket.on('timer:update', (timer) => {
+    let el = document.getElementById('sharedTimer');
+    if (!el) {
+      el = document.createElement('span');
+      el.id = 'sharedTimer';
+      el.className = 'pill';
+      el.style.cssText = 'font-variant-numeric: tabular-nums; font-weight: 700; margin-right: 8px;';
+      const topbarRight = document.querySelector('.topbar-right');
+      if (topbarRight) topbarRight.insertBefore(el, topbarRight.firstChild);
+    }
+    if (timerRaf) cancelAnimationFrame(timerRaf);
+    if (!timer) { el.remove(); return; }
+    const tick = () => {
+      const remaining = Math.max(0, Math.floor((timer.endsAt - Date.now()) / 1000));
+      const min = Math.floor(remaining / 60);
+      const sec = remaining % 60;
+      el.textContent = `⏱ ${timer.label}: ${min}:${String(sec).padStart(2, '0')}`;
+      if (remaining <= 0) {
+        el.className = 'pill bad';
+        el.textContent = `⏱ ${timer.label}: TIME UP`;
+        return;
+      }
+      timerRaf = requestAnimationFrame(tick);
+    };
+    tick();
+  });
+
+  /* -------- Transcript download -------- */
+  const dtBtn = $('#downloadTranscript');
+  if (dtBtn) {
+    dtBtn.addEventListener('click', () => {
+      const el = $('#transcriptList');
+      if (!el) return;
+      const blob = new Blob([el.innerText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transcript-${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  const ctBtn = $('#copyTranscript');
+  if (ctBtn) {
+    ctBtn.addEventListener('click', async () => {
+      const el = $('#transcriptList');
+      if (!el) return;
+      try {
+        await navigator.clipboard.writeText(el.innerText);
+        toast('Transcript copied', 'ok');
+      } catch { /* ignore */ }
+    });
+  }
+
+
+  /* -------- Agenda -------- */
+  socket.on('agenda:list', (list) => renderAgenda(list || []));
+
+  /* -------- Transcript -------- */
+  function appendTranscriptLine(line) {
+    const el = $('#transcriptList');
+    if (!el) return;
+    const d = document.createElement('div');
+    d.className = 'msg';
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = `${line.speaker} · ${fmtTime(line.at)}`;
+    d.appendChild(who);
+    const t = document.createElement('span');
+    t.textContent = line.text;
+    d.appendChild(t);
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  socket.on('transcript:line', appendTranscriptLine);
+
+
+  /* -------- Host actions -------- */
   socket.on('host:force-mute', () => {
     const state = mesh.forceMute();
-    const bm = $('#btnMic');
-    if (bm) bm.className = 'ctrl off';
+    const bm = $('#btnMic'); if (bm) bm.className = 'ctrl off';
     socket.emit('media:state', state);
     renderPeople();
     toast('Host muted you', 'info');
@@ -648,13 +917,12 @@ async function boot() {
     setTimeout(() => (location.href = '/app.html'), 1200);
   });
   socket.on('host:locked', ({ locked }) => {
-    const lb = $('#lockBadge');
-    if (lb) lb.classList.toggle('hidden', !locked);
-    const lr = $('#lockRoom');
-    if (lr) lr.textContent = locked ? 'Unlock room' : 'Lock room';
+    const lb = $('#lockBadge'); if (lb) lb.classList.toggle('hidden', !locked);
+    const lr = $('#lockRoom'); if (lr) lr.textContent = locked ? 'Unlock room' : 'Lock room';
     toast(locked ? 'Room locked' : 'Room unlocked', 'info');
   });
 
+  /* -------- Captions -------- */
   socket.on('caption', ({ name, text }) => {
     const overlay = $('#captionsOverlay');
     const el = $('#captionsText');
@@ -666,12 +934,11 @@ async function boot() {
     who.style.color = 'var(--accent)';
     el.appendChild(who);
     el.appendChild(document.createTextNode(text));
-
     clearTimeout(captionTimer);
     captionTimer = setTimeout(() => overlay.classList.add('hidden'), 5000);
   });
 
-  /* -------- chat input -------- */
+  /* -------- CHAT input -------- */
   const chatForm = $('#chatForm');
   if (chatForm) {
     chatForm.addEventListener('submit', (e) => {
@@ -683,7 +950,7 @@ async function boot() {
     });
   }
 
-  /* -------- notes -------- */
+  /* -------- Notes -------- */
   let notesTimer = null;
   const ne = $('#notesEditor');
   if (ne) {
@@ -693,7 +960,7 @@ async function boot() {
     });
   }
 
-  /* -------- polls -------- */
+  /* -------- Polls -------- */
   const createPollBtn = $('#createPoll');
   if (createPollBtn) {
     createPollBtn.addEventListener('click', () => {
@@ -710,12 +977,55 @@ async function boot() {
     });
   }
 
-  /* -------- reactions -------- */
+  /* -------- Waiting room button -------- */
+  const wt = $('#waitingToggle');
+  if (wt) {
+    wt.addEventListener('click', () => {
+      const enabled = !wt.classList.contains('active');
+      socket.emit('host:toggle-waiting', enabled);
+    });
+  }
+
+  /* -------- Breakout controls -------- */
+  const cb = $('#createBreakout');
+  if (cb) {
+    cb.addEventListener('click', () => {
+      const name = ($('#breakoutName') || {}).value || '';
+      socket.emit('breakout:create', { name: name.trim() });
+      if ($('#breakoutName')) $('#breakoutName').value = '';
+    });
+  }
+
+  /* -------- Timer button -------- */
+  const st = $('#startTimer');
+  if (st) {
+    st.addEventListener('click', () => {
+      const seconds = Number(prompt('Timer duration (seconds):', '300'));
+      if (!seconds) return;
+      const label = prompt('Label:', 'Break') || 'Timer';
+      socket.emit('timer:start', { seconds, label });
+    });
+  }
+
+  /* -------- Agenda -------- */
+  const addAg = $('#addAgenda');
+  if (addAg) {
+    addAg.addEventListener('click', () => {
+      const text = ($('#agendaItem') || {}).value || '';
+      const minutes = Number(($('#agendaMinutes') || {}).value) || 0;
+      if (!text.trim()) return;
+      socket.emit('agenda:add', { text: text.trim(), minutes });
+      if ($('#agendaItem')) $('#agendaItem').value = '';
+      if ($('#agendaMinutes')) $('#agendaMinutes').value = '';
+    });
+  }
+
+  /* -------- Reactions -------- */
   document.querySelectorAll('.reaction-btn').forEach((btn) => {
     btn.addEventListener('click', () => socket.emit('reaction', btn.dataset.emoji));
   });
 
-  /* -------- files -------- */
+  /* -------- Files -------- */
   const fileInput = $('#fileInput');
   if (fileInput) {
     fileInput.addEventListener('change', async (e) => {
@@ -765,7 +1075,7 @@ async function boot() {
     });
   }
 
-  /* -------- controls -------- */
+  /* -------- Controls -------- */
   const btnMic = $('#btnMic');
   if (btnMic) {
     btnMic.addEventListener('click', () => {
@@ -818,22 +1128,23 @@ async function boot() {
         toast('Link copied', 'ok');
       } catch {
         const rl = $('#roomLink');
-        if (rl) {
-          rl.select();
-          document.execCommand('copy');
-        }
+        if (rl) { rl.select(); document.execCommand('copy'); }
       }
     });
   }
 
-  /* -------- recording -------- */
+  /* -------- Recording -------- */
   const btnRecord = $('#btnRecord');
   if (btnRecord) {
     btnRecord.addEventListener('click', () => {
       if (!recorder) {
         const combined = new MediaStream();
         mesh.localStream.getTracks().forEach((t) => combined.addTrack(t));
-        recorder = new MediaRecorder(combined, { mimeType: 'video/webm;codecs=vp9,opus' });
+        try {
+          recorder = new MediaRecorder(combined, { mimeType: 'video/webm;codecs=vp9,opus' });
+        } catch {
+          recorder = new MediaRecorder(combined);
+        }
         recordingChunks = [];
         recorder.ondataavailable = (e) => { if (e.data.size > 0) recordingChunks.push(e.data); };
         recorder.onstop = () => {
@@ -857,7 +1168,7 @@ async function boot() {
     });
   }
 
-  /* -------- host controls -------- */
+  /* -------- Host controls -------- */
   const muteAllBtn = $('#muteAll');
   if (muteAllBtn) muteAllBtn.addEventListener('click', () => socket.emit('host:mute-all'));
   const lockRoomBtn = $('#lockRoom');
@@ -868,7 +1179,16 @@ async function boot() {
     });
   }
 
-  /* -------- leave -------- */
+  /* -------- Analytics button -------- */
+  const btnAnalytics = $('#btnAnalytics');
+  if (btnAnalytics) {
+    btnAnalytics.addEventListener('click', () => {
+      window.open(`/analytics.html?id=${encodeURIComponent(roomId)}`, '_blank');
+    });
+  }
+
+
+  /* -------- Leave -------- */
   const btnLeave = $('#btnLeave');
   if (btnLeave) {
     btnLeave.addEventListener('click', () => {
@@ -879,7 +1199,7 @@ async function boot() {
     });
   }
 
-  /* -------- keyboard shortcuts -------- */
+  /* -------- Keyboard shortcuts -------- */
   document.addEventListener('keydown', (e) => {
     if (e.target.matches('input, textarea')) return;
     const k = e.key.toLowerCase();
@@ -892,8 +1212,8 @@ async function boot() {
   });
 
   window.addEventListener('beforeunload', () => {
-    try { mesh.destroy(); } catch { /* ignore */ }
-    try { socket.disconnect(); } catch { /* ignore */ }
+    try { mesh.destroy(); } catch {}
+    try { socket.disconnect(); } catch {}
   });
 }
 

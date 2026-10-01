@@ -22,6 +22,8 @@ const db = require('./db');
 const auth = require('./auth');
 const store = require('./store');
 const sanitize = require('./sanitize');
+const scheduling = require('./scheduling');
+const reminders = require('./reminders');
 
 /* ------------------------------------------------------------------ */
 /* Config                                                              */
@@ -196,6 +198,7 @@ app.use('/api/auth/register', authLimiter);
 
 app.use(express.static(PUBLIC_DIR, { extensions: ['html'], maxAge: '1h' }));
 app.use('/api/auth', auth.router);
+app.use('/api/schedule', scheduling.router);
 
 /* ------------------------------------------------------------------ */
 /* REST API                                                            */
@@ -330,6 +333,122 @@ app.post('/api/upload', auth.requireAuth, upload.single('file'), (req, res) => {
   res.json({ file: entry });
 });
 
+
+/* ---------------- Meeting Summary (Extractive) ---------------- */
+
+function summarizeTranscript(lines) {
+  if (!Array.isArray(lines) || lines.length === 0) return { summary: '', wordCount: 0 };
+
+  const all = lines.map((l) => l.text).join(' ');
+  const wordCount = all.split(/\s+/).filter(Boolean).length;
+
+  // Stopwords
+  const stopwords = new Set([
+    'the','a','an','and','or','but','to','of','in','is','it','that','for','on','with',
+    'this','as','at','be','by','from','are','was','were','has','have','had','will',
+    'can','could','would','should','may','might','do','does','did','not','no','so','if',
+    'we','you','i','he','she','they','them','us','our','your','their','my','me',
+  ]);
+
+  // Split into sentences
+  const sentences = all
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 15);
+
+  if (sentences.length === 0) return { summary: '', wordCount };
+
+  // Word frequency
+  const freq = {};
+  for (const w of all.toLowerCase().split(/\s+/)) {
+    const clean = w.replace(/[^a-z0-9]/g, '');
+    if (clean.length < 3 || stopwords.has(clean)) continue;
+    freq[clean] = (freq[clean] || 0) + 1;
+  }
+
+  // Score sentences
+  const scored = sentences.map((s) => {
+    const words = s.toLowerCase().split(/\s+/).filter((w) => !stopwords.has(w));
+    const score = words.reduce((acc, w) => acc + (freq[w.replace(/[^a-z0-9]/g, '')] || 0), 0) / Math.max(1, words.length);
+    return { text: s, score };
+  });
+
+  // Top 5 sentences
+  const top = scored.sort((a, b) => b.score - a.score).slice(0, 5);
+  // Restore original order
+  const summary = top.map((s) => `• ${s.text}`).join('\n\n');
+
+  return { summary, wordCount };
+}
+
+app.get('/api/rooms/:id/summary', auth.requireAuth, (req, res) => {
+  const roomId = sanitize.cleanRoomId(req.params.id);
+  const room = store.getRoom(roomId);
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  if (room.ownerId !== req.user.id && !store.isUserInRoom(roomId, req.user.id)) {
+    return res.status(403).json({ error: 'Not in this room' });
+  }
+
+  const result = summarizeTranscript(room.transcript || []);
+  res.json({ summary: result.summary, wordCount: result.wordCount, lines: (room.transcript || []).length });
+});
+
+
+/* ---------------- Meeting Analytics ---------------- */
+
+app.get('/api/rooms/:id/analytics', auth.requireAuth, (req, res) => {
+  const roomId = sanitize.cleanRoomId(req.params.id);
+  const room = store.getRoom(roomId);
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  if (!store.isUserInRoom(roomId, req.user.id) && room.ownerId !== req.user.id) {
+    return res.status(403).json({ error: 'Not in this room' });
+  }
+
+  const log = room.attendanceLog || [];
+  const userSessions = {};
+  const joins = {};
+
+  for (const entry of log) {
+    if (entry.event === 'join') {
+      joins[entry.socketId] = { name: entry.name, at: entry.at };
+    } else if (entry.event === 'leave' && joins[entry.socketId]) {
+      const j = joins[entry.socketId];
+      const duration = entry.at - j.at;
+      userSessions[j.name] = (userSessions[j.name] || 0) + duration;
+      delete joins[entry.socketId];
+    }
+  }
+
+  // Currently active sessions
+  const now = Date.now();
+  for (const sid of Object.keys(joins)) {
+    const j = joins[sid];
+    userSessions[j.name] = (userSessions[j.name] || 0) + (now - j.at);
+  }
+
+  res.json({
+    analytics: {
+      roomId,
+      name: room.name,
+      createdAt: room.createdAt,
+      currentParticipants: room.members.size,
+      totalJoined: Object.keys(userSessions).length,
+      totalMessages: room.messages.length,
+      totalFiles: room.files.length,
+      totalStrokes: room.strokes.length,
+      polls: room.polls.length,
+      participants: Object.entries(userSessions)
+        .map(([name, ms]) => ({
+          name,
+          durationMs: ms,
+          durationMin: Math.round(ms / 60000),
+        }))
+        .sort((a, b) => b.durationMs - a.durationMs),
+    },
+  });
+});
+
+
 app.get('/api/files/:id', auth.requireAuth, (req, res) => {
   const rec = store.getFile(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Not found' });
@@ -445,7 +564,146 @@ function sanitizeStroke(s) {
   return { x0, y0, x1, y1, color, width, erase: Boolean(s.erase) };
 }
 
+/* ---------------- Waiting room ---------------- */
+const waitingRooms = new Map(); // roomId -> Map<socketId, {user}>
+
+function getWaiting(roomId) {
+  if (!waitingRooms.has(roomId)) waitingRooms.set(roomId, new Map());
+  return waitingRooms.get(roomId);
+}
+
+function listBreakouts(room) {
+  if (!room || !room.breakouts) return [];
+  return [...room.breakouts.values()].map((b) => ({
+    id: b.id,
+    name: b.name,
+    participants: [...b.participants],
+  }));
+}
+
+function broadcastWaiting(roomId) {
+  const room = store.getRoom(roomId);
+  if (!room) return;
+  const q = getWaiting(roomId);
+  const list = [...q.values()].map((w) => ({ socketId: w.socketId, name: w.user.name }));
+  io.to(roomId).emit('waiting:list', { waiting: list });
+}
+
 io.on('connection', (socket) => {
+  /* ---- Waiting room ---- */
+  socket.on('waiting:admit', ({ targetId }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+
+    const q = getWaiting(roomId);
+    if (!q.has(targetId)) return;
+    q.delete(targetId);
+    io.to(targetId).emit('waiting:admitted');
+    broadcastWaiting(roomId);
+    auth.audit(socket.user.id, 'waiting_admit', targetId, socket.handshake.address);
+  });
+
+  socket.on('waiting:deny', ({ targetId }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+
+    const q = getWaiting(roomId);
+    if (!q.has(targetId)) return;
+    q.delete(targetId);
+    io.to(targetId).emit('waiting:denied');
+    broadcastWaiting(roomId);
+    auth.audit(socket.user.id, 'waiting_deny', targetId, socket.handshake.address);
+  });
+
+  socket.on('host:toggle-waiting', (enabled) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+    const room = store.getRoom(roomId);
+    if (!room) return;
+    room.waitingRoom = Boolean(enabled);
+    io.to(roomId).emit('host:waiting-toggled', { enabled: room.waitingRoom });
+    auth.audit(socket.user.id, 'waiting_toggle', String(room.waitingRoom), socket.handshake.address);
+  });
+
+  /* ---- Breakout rooms ---- */
+  socket.on('breakout:create', ({ name }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+
+    const room = store.getRoom(roomId);
+    if (!room) return;
+    if (!room.breakouts) room.breakouts = new Map();
+
+    const bid = crypto.randomBytes(3).toString('hex');
+    room.breakouts.set(bid, {
+      id: bid,
+      name: String(name || `Room ${room.breakouts.size + 1}`).slice(0, 60),
+      participants: new Set(),
+    });
+
+    io.to(roomId).emit('breakout:list', listBreakouts(room));
+  });
+
+  socket.on('breakout:assign', ({ breakoutId, socketIds }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+    const room = store.getRoom(roomId);
+    if (!room || !room.breakouts) return;
+    const b = room.breakouts.get(breakoutId);
+    if (!b) return;
+
+    for (const sid of (socketIds || [])) {
+      if (typeof sid !== 'string') continue;
+      b.participants.add(sid);
+      io.to(sid).emit('breakout:assigned', { breakoutId, name: b.name });
+    }
+    io.to(roomId).emit('breakout:list', listBreakouts(room));
+  });
+
+  socket.on('breakout:close', ({ breakoutId }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+    const room = store.getRoom(roomId);
+    if (!room || !room.breakouts) return;
+    const b = room.breakouts.get(breakoutId);
+    if (!b) return;
+
+    for (const sid of b.participants) io.to(sid).emit('breakout:closed');
+    room.breakouts.delete(breakoutId);
+    io.to(roomId).emit('breakout:list', listBreakouts(room));
+  });
+
+  /* ---- Shared timer ---- */
+  socket.on('timer:start', ({ seconds, label }) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+    const room = store.getRoom(roomId);
+    if (!room) return;
+
+    const secs = Math.max(1, Math.min(3600, Number(seconds) || 300));
+    room.timer = {
+      endsAt: Date.now() + secs * 1000,
+      label: String(label || 'Timer').slice(0, 40),
+    };
+    io.to(roomId).emit('timer:update', room.timer);
+  });
+
+  socket.on('timer:stop', () => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+    const room = store.getRoom(roomId);
+    if (!room) return;
+    room.timer = null;
+    io.to(roomId).emit('timer:update', null);
+  });
   // Per-socket rate limiting on every event
   const _originalOnEvent = socket.onevent.bind(socket);
   socket.onevent = function (packet) {
@@ -515,15 +773,39 @@ io.on('connection', (socket) => {
         isOwner: p.isOwner,
       }));
 
+// Waiting room gate
+if (room.waitingRoom && !store.isModerator(roomId, socket.user.id)) {
+  const alreadyMember = [...room.members.values()].some((m) => m.id === socket.user.id);
+  if (!alreadyMember) {
+    const q = getWaiting(roomId);
+    q.set(socket.id, { socketId: socket.id, user: socket.user });
+    socket.data.waitingRoomId = roomId;
+    broadcastWaiting(roomId);
+    return ack({ waiting: true, message: 'Waiting for host approval' });
+  }
+}
       store.join(roomId, socket.id, socket.user);
       socket.data.roomId = roomId;
       socket.join(roomId);
+
+store.addAttendance(roomId, {
+  socketId: socket.id,
+  userId: socket.user.id,
+  name: socket.user.name,
+  event: 'join',
+  at: Date.now(),
+});
 
       ack({
         selfId: socket.id,
         name: socket.user.name,
         isOwner: socket.user.id === room.ownerId,
         peers: existing,
+        waitingRoom: room.waitingRoom,
+        breakouts: listBreakouts(room),
+        timer: room.timer || null,
+        agenda: room.agenda || [],
+        transcript: (room.transcript || []).slice(-200),
         strokes: room.strokes,
         files: room.files,
         messages: room.messages.slice(-100),
@@ -599,6 +881,29 @@ io.on('connection', (socket) => {
     if (!clean) return;
     socket.to(roomId).emit('caption', { name: socket.user.name, text: clean });
   });
+
+
+  /* ---- transcript ---- */
+  socket.on('transcript:append', (text) => {
+    const roomId = socket.data.roomId;
+    if (!roomId || typeof text !== 'string') return;
+    const room = store.getRoom(roomId);
+    if (!room) return;
+    if (!room.transcript) room.transcript = [];
+    if (room.transcript.length > 1000) room.transcript.splice(0, 200);
+
+    const clean = sanitize.cleanText(text, 500);
+    if (!clean) return;
+
+    const line = {
+      speaker: socket.user.name,
+      text: clean,
+      at: Date.now(),
+    };
+    room.transcript.push(line);
+    socket.to(roomId).emit('transcript:line', line);
+  });
+
 
   /* ---- reactions ---- */
   socket.on('reaction', (emoji) => {
@@ -725,9 +1030,96 @@ io.on('connection', (socket) => {
     );
   });
 
-  socket.on('disconnect', () => {
+  /* ---- Agenda ---- */
+  socket.on('agenda:add', (payload) => {
+    const roomId = socket.data.roomId;
+    if (!roomId || !payload) return;
+    const room = store.getRoom(roomId);
+    if (!room) return;
+    if (!room.agenda) room.agenda = [];
+    if (room.agenda.length >= 50) return;
+
+    const text = sanitize.cleanText(payload.text, 200);
+    if (!text) return;
+
+    room.agenda.push({
+      text,
+      minutes: Math.min(120, Math.max(0, Number(payload.minutes) || 0)),
+      done: false,
+    });
+    io.to(roomId).emit('agenda:list', room.agenda);
+  });
+
+  socket.on('agenda:toggle', ({ index } = {}) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
+    const room = store.getRoom(roomId);
+    if (!room || !room.agenda || !room.agenda[index]) return;
+    room.agenda[index].done = !room.agenda[index].done;
+    io.to(roomId).emit('agenda:list', room.agenda);
+  });
+
+  socket.on('agenda:remove', ({ index } = {}) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    if (!store.isModerator(roomId, socket.user.id)) return;
+    const room = store.getRoom(roomId);
+    if (!room || !room.agenda || !room.agenda[index]) return;
+    room.agenda.splice(index, 1);
+    io.to(roomId).emit('agenda:list', room.agenda);
+  });
+
+  /* ---- Timer ping (client requests timer state on join) ---- */
+  socket.on('timer:ping', () => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    const room = store.getRoom(roomId);
+    if (!room) return;
+    socket.emit('timer:update', room.timer || null);
+  });
+
+  /* ---- Moderator role management ---- */
+  socket.on('host:add-moderator', ({ userId } = {}) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    const room = store.getRoom(roomId);
+    if (!room || room.ownerId !== socket.user.id) return;
+    if (!room.moderators) room.moderators = new Set();
+    room.moderators.add(userId);
+    io.to(roomId).emit('moderators:updated', { moderators: [...room.moderators] });
+  });
+
+  socket.on('host:remove-moderator', ({ userId } = {}) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    const room = store.getRoom(roomId);
+    if (!room || room.ownerId !== socket.user.id) return;
+    if (room.moderators) room.moderators.delete(userId);
+    io.to(roomId).emit('moderators:updated', { moderators: [...(room.moderators || [])] });
+  });
+
+
+    socket.on('disconnect', () => {
+    // Cleanup from waiting room if present
+    const waitingRoomId = socket.data.waitingRoomId;
+    if (waitingRoomId) {
+      const q = getWaiting(waitingRoomId);
+      q.delete(socket.id);
+      broadcastWaiting(waitingRoomId);
+    }
+
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+
+    // Record attendance leave
+    store.addAttendance(roomId, {
+      socketId: socket.id,
+      userId: socket.user.id,
+      name: socket.user.name,
+      event: 'leave',
+      at: Date.now(),
+    });
+
     store.leave(roomId, socket.id);
     socket.to(roomId).emit('peer:left', { peerId: socket.id });
   });
@@ -748,6 +1140,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Server error' });
 });
 
+/* Start background reminder scheduler */
+reminders.startReminders(io);
 server.listen(PORT, () => {
   console.log('');
   console.log('  ╔════════════════════════════════════════════════════╗');

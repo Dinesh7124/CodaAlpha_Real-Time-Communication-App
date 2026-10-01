@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings — RTC</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="dash-body">
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="/app.html" class="brand"><span class="logo-dot">◉</span> RTC</a>
+      <span class="room-name">Settings</span>
+    </div>
+    <div class="topbar-right">
+      <button id="themeToggle" class="icon-btn">🌙</button>
+      <a href="/app.html" class="btn btn-ghost">Back</a>
+    </div>
+  </header>
+
+  <main class="dash-main">
+    <section class="panel">
+      <h2>🔐 Two-Factor Authentication</h2>
+      <p class="hint">Add an extra layer of security to your account using Google Authenticator, Authy, or any TOTP app.</p>
+
+      <div id="twofaStatus" style="padding: 14px; background: var(--bg-3); border-radius: 12px; margin-bottom: 18px; border: 1px solid var(--line);">
+        Loading…
+      </div>
+
+      <div id="setupSection" class="hidden">
+        <p style="font-size: 14px; color: var(--muted);">Scan this QR code with your authenticator app:</p>
+        <div style="text-align: center; padding: 18px; background: #fff; border-radius: 12px; display: inline-block; margin: 10px 0;">
+          <img id="qrImg" alt="QR" style="display: block;" />
+        </div>
+        <p style="font-size: 12px; color: var(--muted);">Or enter this secret manually:</p>
+        <code id="secretText" style="display: block; padding: 10px; background: var(--bg); border-radius: 8px; font-size: 13px; word-break: break-all; margin-bottom: 16px;"></code>
+
+        <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">Enter the 6-digit code from your app:</label>
+        <input id="verifyCode" class="device-select" placeholder="123456" maxlength="6" style="width: 200px;" />
+        <button id="enableBtn" class="btn" style="margin-left: 10px;">Enable 2FA</button>
+      </div>
+
+      <div id="disableSection" class="hidden">
+        <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">Enter your current 6-digit code to disable 2FA:</label>
+        <input id="disableCode" class="device-select" placeholder="123456" maxlength="6" style="width: 200px;" />
+        <button id="disableBtn" class="btn btn-ghost" style="margin-left: 10px; color: #fca5a5;">Disable 2FA</button>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/settings.js"></script>
+</body>
+</html>

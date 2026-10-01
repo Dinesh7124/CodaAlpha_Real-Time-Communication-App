@@ -25,6 +25,7 @@ function publicRoom(room) {
     ownerName: room.ownerName,
     locked: room.locked,
     hasPassword: Boolean(room.passwordHash),
+    waitingRoom: Boolean(room.waitingRoom),
     createdAt: room.createdAt,
     participants: room.members.size,
   };
@@ -43,6 +44,13 @@ async function createRoom(user, name, password) {
     ownerName: user.name,
     passwordHash,
     locked: false,
+    waitingRoom: false,
+    breakouts: new Map(),
+    timer: null,
+    attendanceLog: [],
+    moderators: new Set(),
+    agenda: [],
+    transcript: [],
     createdAt: Date.now(),
     emptySince: Date.now(),
     members: new Map(),
@@ -56,9 +64,11 @@ async function createRoom(user, name, password) {
 
   rooms.set(id, room);
 
-  db.prepare(
-    'INSERT INTO rooms (id, name, owner_id, password_hash, locked, created_at) VALUES (?, ?, ?, ?, 0, ?)'
-  ).run(id, room.name, user.id, passwordHash, room.createdAt);
+  try {
+    db.prepare(
+      'INSERT INTO rooms (id, name, owner_id, password_hash, locked, created_at) VALUES (?, ?, ?, ?, 0, ?)'
+    ).run(id, room.name, user.id, passwordHash, room.createdAt);
+  } catch { /* non-fatal */ }
 
   return publicRoom(room);
 }
@@ -93,6 +103,7 @@ function join(roomId, socketId, user) {
     hand: false,
     isOwner: user.id === room.ownerId,
     joinedAt: Date.now(),
+    lastSeen: Date.now(),
   });
   room.emptySince = null;
   return room;
@@ -122,6 +133,21 @@ function isUserInRoom(roomId, userId) {
 function isUserOwner(roomId, userId) {
   const room = rooms.get(roomId);
   return Boolean(room && room.ownerId === userId);
+}
+
+function isModerator(roomId, userId) {
+  const room = rooms.get(roomId);
+  if (!room) return false;
+  if (room.ownerId === userId) return true;
+  return room.moderators && room.moderators.has(userId);
+}
+
+function addAttendance(roomId, entry) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  if (!room.attendanceLog) room.attendanceLog = [];
+  room.attendanceLog.push(entry);
+  if (room.attendanceLog.length > 5000) room.attendanceLog.splice(0, 2000);
 }
 
 /* ---------------- whiteboard ---------------- */
@@ -176,6 +202,31 @@ function votePoll(roomId, pollId, userId, choice) {
   return poll;
 }
 
+/* ---------------- agenda ---------------- */
+
+function addAgendaItem(roomId, item) {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  if (!room.agenda) room.agenda = [];
+  if (room.agenda.length >= 50) return null;
+  room.agenda.push(item);
+  return room.agenda;
+}
+
+function toggleAgendaItem(roomId, index) {
+  const room = rooms.get(roomId);
+  if (!room || !room.agenda || !room.agenda[index]) return null;
+  room.agenda[index].done = !room.agenda[index].done;
+  return room.agenda;
+}
+
+function removeAgendaItem(roomId, index) {
+  const room = rooms.get(roomId);
+  if (!room || !room.agenda) return null;
+  room.agenda.splice(index, 1);
+  return room.agenda;
+}
+
 /* ---------------- files ---------------- */
 
 function registerFile(meta) {
@@ -201,7 +252,9 @@ setInterval(() => {
   for (const [id, room] of rooms) {
     if (room.members.size === 0 && room.emptySince && now - room.emptySince > EMPTY_ROOM_TTL) {
       rooms.delete(id);
-      db.prepare('UPDATE rooms SET ended_at = ? WHERE id = ? AND ended_at IS NULL').run(now, id);
+      try {
+        db.prepare('UPDATE rooms SET ended_at = ? WHERE id = ? AND ended_at IS NULL').run(now, id);
+      } catch { /* ignore */ }
     }
   }
 }, 10 * 60 * 1000).unref();
@@ -218,12 +271,17 @@ module.exports = {
   participants,
   isUserInRoom,
   isUserOwner,
+  isModerator,
+  addAttendance,
   addStroke,
   clearBoard,
   addMessage,
   setNotes,
   createPoll,
   votePoll,
+  addAgendaItem,
+  toggleAgendaItem,
+  removeAgendaItem,
   registerFile,
   getFile,
   addFileEntry,

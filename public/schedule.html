@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Schedule — RTC</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="dash-body">
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="/app.html" class="brand"><span class="logo-dot">◉</span> RTC</a>
+      <span class="room-name">Scheduled Meetings</span>
+    </div>
+    <div class="topbar-right">
+      <button id="themeToggle" class="icon-btn">🌙</button>
+      <a href="/app.html" class="btn btn-ghost">Back to Dashboard</a>
+    </div>
+  </header>
+
+  <main class="dash-main">
+    <section class="panel">
+      <h2>📅 Schedule a Meeting</h2>
+      <p class="hint">Plan a future meeting, add guests, and set recurrence.</p>
+
+      <form id="scheduleForm" style="display: grid; gap: 14px;">
+        <div class="row">
+          <input id="mTitle" type="text" placeholder="Meeting title *" maxlength="120" required style="flex: 2;" />
+        </div>
+
+        <textarea id="mDescription" placeholder="Description (optional)" maxlength="1000"
+          style="background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; color: var(--text); font-family: inherit; resize: vertical; min-height: 70px;"></textarea>
+
+        <div class="row">
+          <div style="flex: 1; min-width: 200px;">
+            <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Start date & time *</label>
+            <input id="mStart" type="datetime-local" required
+              style="width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; color: var(--text);" />
+          </div>
+          <div style="flex: 1; min-width: 150px;">
+            <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Duration (min)</label>
+            <select id="mDuration" style="width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; color: var(--text);">
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60" selected>1 hour</option>
+              <option value="120">2 hours</option>
+              <option value="240">4 hours</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div style="flex: 1; min-width: 200px;">
+            <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Recurrence</label>
+            <select id="mRecurrence" style="width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; color: var(--text);">
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily (4 occurrences)</option>
+              <option value="weekly">Weekly (4 occurrences)</option>
+              <option value="monthly">Monthly (4 occurrences)</option>
+            </select>
+          </div>
+          <div style="flex: 1; min-width: 200px;">
+            <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Room password (optional)</label>
+            <input id="mPassword" type="text" placeholder="Min 4 characters" maxlength="100"
+              style="width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; color: var(--text);" />
+          </div>
+        </div>
+
+        <div>
+          <label style="font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px;">Invite guests (comma-separated emails, optional)</label>
+          <input id="mInvites" type="text" placeholder="alice@example.com, bob@example.com"
+            style="width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; color: var(--text);" />
+        </div>
+
+        <button type="submit" class="btn" style="padding: 13px;">📅 Schedule Meeting</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Upcoming Meetings</h2>
+      <p class="hint">Your next 20 scheduled meetings.</p>
+      <div id="upcomingList" class="room-list">
+        <div class="empty">Loading…</div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/schedule.js"></script>
+</body>
+</html>
