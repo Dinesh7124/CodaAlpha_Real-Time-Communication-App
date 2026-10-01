@@ -1,0 +1,11 @@
+node_modules/
+data/
+uploads/
+certs/
+.env
+*.log
+*.db
+*.db-wal
+*.db-shm
+cloudflared.exe
+.DS_Store

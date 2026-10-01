@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in — RTC</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="logo-dot">◉</div>
+        <span class="brand-text">RTC</span>
+      </div>
+      <div class="auth-sub">Video calls, screen sharing, whiteboard and files — all in the browser.</div>
+
+      <div id="alert" class="alert error hidden"></div>
+
+      <form id="loginForm">
+        <div class="field">
+          <label for="loginEmail">Email</label>
+          <input id="loginEmail" type="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+        </div>
+        <button class="btn" type="submit">Sign in</button>
+      </form>
+
+      <form id="registerForm" class="hidden">
+        <div class="field">
+          <label for="regName">Display name</label>
+          <input id="regName" type="text" autocomplete="name" maxlength="40" required />
+        </div>
+        <div class="field">
+          <label for="regEmail">Email</label>
+          <input id="regEmail" type="email" autocomplete="email" required />
+        </div>
+        <div class="field">
+          <label for="regPassword">Password (min 8 characters)</label>
+          <input id="regPassword" type="password" autocomplete="new-password" minlength="8" required />
+        </div>
+        <button class="btn" type="submit">Create account</button>
+      </form>
+
+      <div class="auth-switch">
+        <span id="switchText">No account yet?</span>
+        <a href="#" id="switchLink">Create one</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/auth-page.js"></script>
+</body>
+</html>

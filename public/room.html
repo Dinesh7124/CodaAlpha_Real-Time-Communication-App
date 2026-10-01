@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Meeting — RTC</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="room-body">
+  <header class="topbar">
+    <div class="topbar-left">
+      <a href="/app.html" class="brand"><span class="logo-dot">◉</span> RTC</a>
+      <span id="roomName" class="room-name">…</span>
+      <span id="connState" class="pill"><span class="dot"></span> connecting</span>
+      <span id="lockBadge" class="pill hidden">🔒 Locked</span>
+    </div>
+    <div class="topbar-right">
+      <input id="roomLink" class="link-box" readonly />
+      <button id="qrBtn" class="icon-btn" title="QR code">▣</button>
+      <button id="copyLink" class="btn btn-ghost">Copy link</button>
+      <button id="themeToggle" class="icon-btn" title="Theme">🌙</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <!-- Video grid -->
+    <section id="videoArea" class="video-area">
+      <div id="videoGrid" class="video-grid"></div>
+    </section>
+
+    <!-- Whiteboard -->
+    <section id="boardArea" class="board-area hidden">
+      <div class="board-toolbar">
+        <button class="swatch active" data-color="#ffffff" style="--c:#ffffff"></button>
+        <button class="swatch" data-color="#ef4444" style="--c:#ef4444"></button>
+        <button class="swatch" data-color="#22c55e" style="--c:#22c55e"></button>
+        <button class="swatch" data-color="#3b82f6" style="--c:#3b82f6"></button>
+        <button class="swatch" data-color="#eab308" style="--c:#eab308"></button>
+        <button class="swatch" data-color="#a855f7" style="--c:#a855f7"></button>
+        <span style="flex:1"></span>
+        <button id="eraserBtn" class="btn btn-ghost">Eraser: off</button>
+        <button id="clearBoard" class="btn btn-ghost">Clear</button>
+        <button id="closeBoard" class="btn btn-ghost">Close</button>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="board"></canvas>
+      </div>
+    </section>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="tabs">
+        <button class="tab active" data-tab="chat">Chat</button>
+        <button class="tab" data-tab="files">Files</button>
+        <button class="tab" data-tab="people">People</button>
+        <button class="tab" data-tab="notes">Notes</button>
+        <button class="tab" data-tab="polls">Polls</button>
+      </div>
+
+      <div id="tab-chat" class="tab-panel active">
+        <div id="chatLog" class="chat-log"></div>
+        <form id="chatForm" class="chat-form">
+          <input id="chatInput" type="text" placeholder="Message…" autocomplete="off" maxlength="2000" />
+          <button class="btn" type="submit">Send</button>
+        </form>
+      </div>
+
+      <div id="tab-files" class="tab-panel">
+        <label class="upload-zone">
+          <input type="file" id="fileInput" hidden />
+          <span id="uploadText">Click to upload (max 100 MB)</span>
+        </label>
+        <div id="uploadProgress" class="progress-bar"><div></div></div>
+        <div id="fileList" class="file-list"></div>
+      </div>
+
+      <div id="tab-people" class="tab-panel">
+        <div id="peopleList" class="people-list"></div>
+        <div id="hostControls" class="hidden" style="padding: 12px; border-top: 1px solid var(--line);">
+          <div style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">Host controls</div>
+          <div style="display: flex; gap: 8px;">
+            <button id="muteAll" class="btn btn-ghost" style="flex: 1; font-size: 12px;">Mute all</button>
+            <button id="lockRoom" class="btn btn-ghost" style="flex: 1; font-size: 12px;">Lock room</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-notes" class="tab-panel">
+        <textarea id="notesEditor" class="notes-editor" placeholder="Shared notes… (everyone can edit)"></textarea>
+      </div>
+
+      <div id="tab-polls" class="tab-panel">
+        <div style="padding: 12px; border-bottom: 1px solid var(--line);">
+          <input id="pollQuestion" class="device-select" placeholder="Question" />
+          <input id="pollOption1" class="device-select" placeholder="Option 1" />
+          <input id="pollOption2" class="device-select" placeholder="Option 2" />
+          <input id="pollOption3" class="device-select" placeholder="Option 3 (optional)" />
+          <button id="createPoll" class="btn" style="width: 100%;">Create poll</button>
+        </div>
+        <div id="pollList" class="chat-log"></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Captions overlay (fixed position, so it can live anywhere) -->
+  <div id="captionsOverlay" class="captions-overlay hidden">
+    <div id="captionsText" class="captions-text"></div>
+  </div>
+
+  <footer class="controls">
+    <div class="reactions-bar">
+      <button class="reaction-btn" data-emoji="👍">👍</button>
+      <button class="reaction-btn" data-emoji="❤️">❤️</button>
+      <button class="reaction-btn" data-emoji="😂">😂</button>
+      <button class="reaction-btn" data-emoji="🎉">🎉</button>
+      <button class="reaction-btn" data-emoji="👏">👏</button>
+    </div>
+
+    <button id="btnMic"      class="ctrl on"     title="Mic (M)">🎤</button>
+    <button id="btnCam"      class="ctrl on"     title="Camera (V)">📷</button>
+    <button id="btnHand"     class="ctrl"        title="Raise hand (H)">✋</button>
+    <button id="btnScreen"   class="ctrl"        title="Share screen (S)">🖥️</button>
+    <button id="btnBoard"    class="ctrl"        title="Whiteboard (W)">✏️</button>
+    <button id="btnCaptions" class="ctrl"        title="Live captions (K)">💬</button>
+    <button id="btnRecord"   class="ctrl"        title="Record">⏺️</button>
+    <button id="btnLeave"    class="ctrl danger" title="Leave">📞</button>
+  </footer>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script type="module" src="/js/room.js"></script>
+</body>
+</html>

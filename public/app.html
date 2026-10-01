@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — RTC</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="dash-body">
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="brand"><span class="logo-dot">◉</span> RTC</span>
+    </div>
+    <div class="topbar-right">
+      <button id="themeToggle" class="icon-btn" title="Toggle theme">🌙</button>
+      <span id="whoami" class="pill"></span>
+      <button id="logoutBtn" class="btn btn-ghost">Sign out</button>
+    </div>
+  </header>
+
+  <main class="dash-main">
+    <section class="panel">
+      <h2>Start a new meeting</h2>
+      <p class="hint">Create a room and share the link with anyone you want to invite.</p>
+      <form id="createForm" class="row">
+        <input id="roomName" type="text" placeholder="Meeting name (optional)" maxlength="60" />
+        <input id="roomPassword" type="password" placeholder="Password (optional)" maxlength="100" />
+        <button class="btn" type="submit">Create room</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Join by code</h2>
+      <p class="hint">Paste a room code or a full room link.</p>
+      <form id="joinForm" class="row">
+        <input id="joinCode" type="text" placeholder="e.g. a1b2c3d4" />
+        <button class="btn btn-ghost" type="submit">Join</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Active rooms</h2>
+      <p class="hint">Rooms with at least one participant show here.</p>
+      <div id="roomList" class="room-list">
+        <div class="empty">Loading…</div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/js/dashboard.js"></script>
+</body>
+</html>

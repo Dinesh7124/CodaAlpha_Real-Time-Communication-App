@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lobby — RTC</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="lobby-wrap">
+    <div class="lobby-card">
+      <div>
+        <div class="lobby-preview" id="previewBox">
+          <video id="previewVideo" autoplay playsinline muted></video>
+          <div id="camOff" class="off-overlay hidden">📷</div>
+        </div>
+        <div class="mic-meter"><div id="micLevel"></div></div>
+        <p style="margin: 12px 0 0; color: var(--muted); font-size: 12.5px;" id="permHint">
+          Waiting for permission…
+        </p>
+      </div>
+
+      <div>
+        <h2 style="margin: 0 0 6px;">Ready to join?</h2>
+        <p style="color: var(--muted); font-size: 13.5px; margin: 0 0 18px;">
+          Check your camera and mic before entering the room.
+        </p>
+
+        <label style="font-size: 12px; color: var(--muted);">Camera</label>
+        <select id="cameraSelect" class="device-select"></select>
+
+        <label style="font-size: 12px; color: var(--muted);">Microphone</label>
+        <select id="micSelect" class="device-select"></select>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+          <button id="toggleCam" class="btn btn-ghost" style="flex: 1;">📷 Camera on</button>
+          <button id="toggleMic" class="btn btn-ghost" style="flex: 1;">🎤 Mic on</button>
+        </div>
+
+        <div id="passwordWrap" class="hidden">
+          <label style="font-size: 12px; color: var(--muted);">Room password</label>
+          <input id="roomPassword" type="password" class="device-select" placeholder="Enter password" />
+        </div>
+
+        <button id="joinBtn" class="btn" style="width: 100%; padding: 13px; font-size: 15px;">
+          Join meeting →
+        </button>
+        <a href="/app.html" style="display: block; text-align: center; margin-top: 12px; font-size: 13px; color: var(--muted);">
+          Cancel
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/js/lobby.js"></script>
+</body>
+</html>
