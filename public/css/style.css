@@ -382,7 +382,7 @@ a { color: var(--accent); text-decoration: none; }
   box-shadow: 0 20px 60px rgba(0,0,0,.4);
 }
 
-/* Sidebar */
+/* ============ Sidebar ============ */
 .sidebar {
   width: 360px; flex: 0 0 360px;
   background: var(--glass);
@@ -391,20 +391,67 @@ a { color: var(--accent); text-decoration: none; }
   display: flex; flex-direction: column; min-height: 0;
 }
 
-.tabs { display: flex; border-bottom: 1px solid var(--line); }
+/* ✅ FIXED: Tabs - horizontal scroll when overflow */
+.tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  scroll-behavior: smooth;
+  background: var(--bg-2);
+  flex-shrink: 0;
+}
+
+.tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tabs::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+
+.tabs::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
 
 .tab {
-  flex: 1; background: transparent; border: none;
-  padding: 13px 6px; color: var(--muted);
-  cursor: pointer; border-bottom: 2px solid transparent;
-  font-weight: 600; font-size: 12.5px;
-  transition: color .15s, border-color .15s;
+  flex: 0 0 auto;
+  min-width: 68px;
+  background: transparent;
+  border: none;
+  padding: 12px 12px;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  user-select: none;
+  transition: color .15s, background .15s, border-color .15s;
 }
-.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+.tab:hover {
+  color: var(--text);
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
 
 .tab-panel { display: none; flex: 1; min-height: 0; flex-direction: column; }
 .tab-panel.active { display: flex; }
 
+/* Chat */
 .chat-log {
   flex: 1; overflow-y: auto; padding: 16px;
   display: flex; flex-direction: column; gap: 12px;
@@ -421,6 +468,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 .chat-form input:focus { border-color: var(--accent); }
 
+/* Files */
 .upload-zone {
   display: block; margin: 14px; padding: 26px 14px;
   text-align: center; border: 2px dashed var(--line);
@@ -431,7 +479,7 @@ a { color: var(--accent); text-decoration: none; }
 
 .progress-bar {
   height: 6px; background: var(--bg-3); border-radius: 4px;
-  overflow: hidden; margin-top: 12px; display: none;
+  overflow: hidden; margin: 0 14px 12px; display: none;
 }
 .progress-bar.show { display: block; }
 .progress-bar > div {
@@ -453,6 +501,7 @@ a { color: var(--accent); text-decoration: none; }
 .file-item .fmeta { color: var(--muted); font-size: 12px; margin-top: 3px; }
 .file-item a { display: inline-block; margin-top: 8px; font-size: 12px; font-weight: 600; }
 
+/* People */
 .people-list {
   flex: 1; overflow-y: auto; padding: 14px;
   display: flex; flex-direction: column; gap: 8px;
@@ -476,6 +525,8 @@ a { color: var(--accent); text-decoration: none; }
   background: var(--glass);
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--glass-border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .ctrl {
@@ -486,6 +537,7 @@ a { color: var(--accent); text-decoration: none; }
   display: grid; place-items: center;
   transition: transform .12s, background .15s, border-color .15s, box-shadow .15s;
   color: var(--text);
+  flex-shrink: 0;
 }
 .ctrl:hover { transform: translateY(-3px); }
 .ctrl.on { background: var(--bg-3); border-color: var(--accent); }
@@ -502,6 +554,7 @@ a { color: var(--accent); text-decoration: none; }
   backdrop-filter: blur(16px);
   border-radius: 999px;
   border: 1px solid var(--glass-border);
+  flex-shrink: 0;
 }
 .reaction-btn {
   width: 40px; height: 40px; border-radius: 50%;
@@ -538,7 +591,7 @@ a { color: var(--accent); text-decoration: none; }
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* Lobby */
+/* ============ Lobby ============ */
 .lobby-wrap {
   min-height: 100vh;
   display: grid; place-items: center;
@@ -600,7 +653,7 @@ a { color: var(--accent); text-decoration: none; }
 }
 .device-select:focus { border-color: var(--accent); }
 
-/* Notes */
+/* ============ Notes ============ */
 .notes-editor {
   flex: 1; width: 100%;
   background: var(--bg); border: none; outline: none;
@@ -609,7 +662,7 @@ a { color: var(--accent); text-decoration: none; }
   resize: none;
 }
 
-/* Poll */
+/* ============ Polls ============ */
 .poll-card {
   background: var(--bg-3); border: 1px solid var(--line);
   border-radius: 12px; padding: 14px; margin-bottom: 10px;
@@ -632,7 +685,7 @@ a { color: var(--accent); text-decoration: none; }
 .poll-card .bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-3)); }
 .poll-card .count { font-size: 12px; color: var(--muted); min-width: 28px; text-align: right; }
 
-/* QR code */
+/* ============ QR code ============ */
 .qr-box {
   display: grid; place-items: center;
   padding: 16px; background: #fff; border-radius: 12px;
@@ -640,7 +693,42 @@ a { color: var(--accent); text-decoration: none; }
 }
 .qr-box canvas { display: block; }
 
-/* Responsive */
+/* ============ Live Captions ============ */
+.captions-overlay {
+  position: fixed;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 70%;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.captions-text {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 17px;
+  line-height: 1.5;
+  text-align: center;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  animation: captionPop .2s ease-out;
+}
+
+.captions-text .interim {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+@keyframes captionPop {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============ Responsive ============ */
 @media (max-width: 900px) {
   .stage { flex-direction: column; }
   .sidebar { width: 100%; flex: 0 0 280px; border-left: none; border-top: 1px solid var(--line); }
@@ -649,73 +737,15 @@ a { color: var(--accent); text-decoration: none; }
   #board { max-width: 100%; }
   .controls { gap: 8px; padding: 10px; }
   .ctrl { width: 46px; height: 46px; font-size: 18px; }
+  .reactions-bar { padding: 6px; }
+  .reaction-btn { width: 34px; height: 34px; font-size: 18px; }
+  .topbar { padding: 10px 14px; }
+  .room-name { font-size: 12px; }
+  .tab { min-width: 60px; padding: 10px 10px; font-size: 11.5px; }
 }
 
-.captions-overlay {
-  position: fixed;
-  bottom: 100px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 70%;
-  z-index: 50;
-  pointer-events: none;
-}
-
-.captions-text {
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: 12px;
-  font-size: 17px;
-  line-height: 1.5;
-  text-align: center;
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  animation: captionPop .2s ease-out;
-}
-
-.captions-text .interim {
-  opacity: 0.6;
-  font-style: italic;
-}
-
-@keyframes captionPop {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-/* ============ Live captions ============ */
-.captions-overlay {
-  position: fixed;
-  bottom: 100px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 70%;
-  z-index: 50;
-  pointer-events: none;
-}
-
-.captions-text {
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: 12px;
-  font-size: 17px;
-  line-height: 1.5;
-  text-align: center;
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  animation: captionPop .2s ease-out;
-}
-
-.captions-text .interim {
-  opacity: 0.6;
-  font-style: italic;
-}
-
-@keyframes captionPop {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+@media (max-width: 500px) {
+  .tabs { scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { min-width: 56px; padding: 10px 8px; font-size: 11px; }
 }

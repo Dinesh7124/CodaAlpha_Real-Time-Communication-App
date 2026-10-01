@@ -52,7 +52,7 @@ async function createRoom(user, name, password) {
     agenda: [],
     transcript: [],
     createdAt: Date.now(),
-    emptySince: Date.now(),
+    emptySince: null,   // ✅ Room active until first join, then cleared on leave
     members: new Map(),
     strokes: [],
     files: [],

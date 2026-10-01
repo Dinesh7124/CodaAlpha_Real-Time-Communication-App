@@ -94,7 +94,7 @@ app.use(
       useDefaults: false,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'blob:'],
         mediaSrc: ["'self'", 'blob:'],
@@ -196,7 +196,17 @@ app.use('/api/auth/register', authLimiter);
 /* Static + auth routes                                                */
 /* ------------------------------------------------------------------ */
 
-app.use(express.static(PUBLIC_DIR, { extensions: ['html'], maxAge: '1h' }));
+app.use(express.static(PUBLIC_DIR, {
+  extensions: ['html'],
+  maxAge: 0,
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  },
+}));
 app.use('/api/auth', auth.router);
 app.use('/api/schedule', scheduling.router);
 

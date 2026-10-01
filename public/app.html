@@ -42,8 +42,17 @@
     </section>
 
     <section class="panel">
+      <h2>📊 Meeting Analytics</h2>
+      <p class="hint">Enter a room ID to view its analytics and AI-generated meeting summary. Rooms older than 2 hours may have been cleaned up.</p>
+      <form id="analyticsForm" class="row">
+        <input id="analyticsRoomId" type="text" placeholder="Room ID (e.g., a1b2c3d4)" maxlength="32" />
+        <button class="btn" type="submit">View Analytics</button>
+      </form>
+    </section>
+
+    <section class="panel">
       <h2>Active rooms</h2>
-      <p class="hint">Rooms with at least one participant show here.</p>
+      <p class="hint">Rooms with at least one participant show here. Click a room to join, or use the 📊 button to view its analytics.</p>
       <div id="roomList" class="room-list">
         <div class="empty">Loading…</div>
       </div>

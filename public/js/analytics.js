@@ -77,17 +77,25 @@ if (!roomId) location.href = '/app.html';
         pl.appendChild(row);
       }
     }
-      // Load summary
+
+    // Load AI summary
     try {
       const s = await apiJson(`/api/rooms/${encodeURIComponent(roomId)}/summary`);
-      $('#summary').textContent = s.summary || 'No transcript available yet. Enable captions during a meeting to generate a summary.';
-      $('#summaryMeta').textContent = `${s.lines} transcript lines · ${s.wordCount} words`;
+      const summaryEl = $('#summary');
+      if (summaryEl) {
+        summaryEl.textContent = s.summary || 'No transcript available yet. Enable captions during a meeting to generate a summary.';
+      }
+      const metaEl = $('#summaryMeta');
+      if (metaEl) {
+        metaEl.textContent = `${s.lines} transcript lines · ${s.wordCount} words`;
+      }
     } catch (e) {
-      $('#summary').textContent = 'Could not load summary: ' + e.message;
+      const summaryEl = $('#summary');
+      if (summaryEl) summaryEl.textContent = 'Could not load summary: ' + e.message;
     }
 
   } catch (err) {
     $('#roomTitle').textContent = 'Error';
     $('#roomSub').textContent = err.message;
   }
-})();;
+})();
