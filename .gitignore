@@ -1,12 +1,35 @@
+# Dependencies
 node_modules/
+
+# Runtime data
 data/
 uploads/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Certificates
 certs/
 certs_backup/
-.env
+
+# Logs
 *.log
+npm-debug.log*
+
+# Databases
 *.db
 *.db-wal
 *.db-shm
+
+# Cloudflared binary
 cloudflared.exe
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
